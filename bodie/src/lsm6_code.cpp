@@ -16,20 +16,20 @@ significant bit) at this FS setting, so the raw reading of
 
 #include <Wire.h>
 #include <LSM6.h>
-
 LSM6 imu;
 
-char report[80];
+char report[100];
 
 void setup()
 {
   Serial.begin(9600);
   Wire.begin();
 
-  if (!imu.init())
+  
+  while (!imu.init())
   {
     Serial.println("Failed to detect and initialize IMU!");
-    while (1);
+    delay(1000);
   }
   imu.enableDefault();
 }
@@ -37,11 +37,22 @@ void setup()
 void loop()
 {
   imu.read();
+  // Serial.println(imu.g.z);
 
-  snprintf(report, sizeof(report), "A: %6d %6d %6d    G: %6d %6d %6d",
-    imu.a.x, imu.a.y, imu.a.z,
-    imu.g.x, imu.g.y, imu.g.z);
-  Serial.println(report);
-
+  // snprintf(report, sizeof(report), "A: %8.2f %8.2f %8.2f    G: %8.2f %8.2f %8.2f",
+  //   imu.a.x* 0.061, imu.a.y* 0.061, imu.a.z* 0.061,
+  //   imu.g.x, imu.g.y, imu.g.z);
+  Serial.print("A: ");
+  Serial.print((double) imu.a.x* 0.061);
+  Serial.print("     ");
+  Serial.print((double) imu.a.y* 0.061);
+  Serial.print("     ");
+  Serial.print((double) imu.a.z* 0.061);
+  Serial.print("     G: ");
+  Serial.print((double) imu.g.x);
+  Serial.print("     ");
+  Serial.print((double) imu.g.y);
+  Serial.print("     ");
+  Serial.println((double) imu.g.z);
   delay(100);
 }
