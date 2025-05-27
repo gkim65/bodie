@@ -1,34 +1,106 @@
-// #include <Arduino.h>
+/*
+The sensor outputs provided by the library are the raw
+16-bit values obtained by concatenating the 8-bit high and
+low accelerometer and gyro data registers. They can be
+converted to units of g and dps (degrees per second) using
+the conversion factors specified in the datasheet for your
+particular device and full scale setting (gain).
 
-// // put function declarations here:
-// int myFunction(int, int);
+Example: An LSM6DS33 gives an accelerometer Z axis reading
+of 16276 with its default full scale setting of +/- 2 g. The
+LA_So specification in the LSM6DS33 datasheet (page 15)
+states a conversion factor of 0.061 mg/LSB (least
+significant bit) at this FS setting, so the raw reading of
+16276 corresponds to 16276 * 0.061 = 992.8 mg = 0.9928 g.
+*/
 
-// void setup() {
-//   // put your setup code here, to run once:
-//   int result = myFunction(2, 3);
-//   // Initialize LED pin as an output.
-//   pinMode(LED_BUILTIN, OUTPUT);
-// }
- 
-// void loop()
-// {
-//   // Set the LED HIGH
-//   digitalWrite(LED_BUILTIN, HIGH);
- 
-//   // Wait for a second
-//   delay(1000);
- 
-//   // Set the LED LOW
-//   digitalWrite(LED_BUILTIN, LOW);
- 
-//    // Wait for a second
-//   delay(1000);
+#include <Wire.h>
+#include <LSM6.h>
+#include "motor_driver.h"
+#include <Arduino.h>
+LSM6 imu;
 
-// }
+char report[100];
 
-// // put function definitions here:
-// int myFunction(int x, int y) {
-//   return x + y;
-// }
+void setup()
+{
+  Serial.begin(9600);
+  Wire.begin();
 
+  
+  while (!imu.init())
+  {
+    Serial.println("Failed to detect and initialize IMU!");
+    delay(1000);
+  }
+  imu.enableDefault();
 
+  // Setup the motor driver
+  pinMode(motor1pin1, OUTPUT);
+  pinMode(motor1pin2, OUTPUT);
+  pinMode(motor2pin1, OUTPUT);
+  pinMode(motor2pin2, OUTPUT);
+
+  // Motor driver speed control
+  pinMode(9,   OUTPUT); 
+  pinMode(10, OUTPUT);
+}
+
+void loop()
+{
+  imu.read();
+  // Serial.println(imu.g.z);
+
+  // snprintf(report, sizeof(report), "A: %8.2f %8.2f %8.2f    G: %8.2f %8.2f %8.2f",
+  //   imu.a.x* 0.061, imu.a.y* 0.061, imu.a.z* 0.061,
+  //   imu.g.x, imu.g.y, imu.g.z);
+  Serial.print("A: ");
+  Serial.print((double) imu.a.x* 0.061);
+  Serial.print("     ");
+  Serial.print((double) imu.a.y* 0.061);
+  Serial.print("     ");
+  Serial.print((double) imu.a.z* 0.061);
+  Serial.print("     G: ");
+  Serial.print((double) imu.g.x);
+  Serial.print("     ");
+  Serial.print((double) imu.g.y);
+  Serial.print("     ");
+  Serial.println((double) imu.g.z);
+  delay(100);
+
+  int clipped_gz = imu.g.z;
+  if (clipped_gz < -255) clipped_gz = -255;
+  if (clipped_gz > 255) clipped_gz = 255;
+
+  analogWrite(9, abs(clipped_gz));
+  // analogWrite(10, 200); //ENB pin
+  //(Optional)
+  
+  if (clipped_gz > 0) {
+    digitalWrite(motor1pin1, HIGH);
+    digitalWrite(motor1pin2, LOW);
+  } else if (clipped_gz < 0) {
+    digitalWrite(motor1pin1, LOW);
+    digitalWrite(motor1pin2, HIGH);
+  } else {
+    digitalWrite(motor1pin1, LOW);
+    digitalWrite(motor1pin2, LOW);
+  }
+  // digitalWrite(motor1pin1,   HIGH);
+  // digitalWrite(motor1pin2, LOW);
+
+  // digitalWrite(motor2pin1, HIGH);
+  //  digitalWrite(motor2pin2, LOW);
+  // delay(3000);
+
+  // digitalWrite(motor1pin1,   LOW);
+  // digitalWrite(motor1pin2, HIGH);
+
+  // digitalWrite(motor2pin1, LOW);
+  // digitalWrite(motor2pin2, HIGH);
+  // delay(3000);
+
+  // digitalWrite(motor1pin1,   LOW);
+  // digitalWrite(motor1pin2, HIGH);
+  // delay(3000);
+}
