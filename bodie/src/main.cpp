@@ -54,25 +54,33 @@ void loop()
   // snprintf(report, sizeof(report), "A: %8.2f %8.2f %8.2f    G: %8.2f %8.2f %8.2f",
   //   imu.a.x* 0.061, imu.a.y* 0.061, imu.a.z* 0.061,
   //   imu.g.x, imu.g.y, imu.g.z);
-  Serial.print("A: ");
-  Serial.print((double) imu.a.x* 0.061);
-  Serial.print("     ");
-  Serial.print((double) imu.a.y* 0.061);
-  Serial.print("     ");
-  Serial.print((double) imu.a.z* 0.061);
-  Serial.print("     G: ");
-  Serial.print((double) imu.g.x);
-  Serial.print("     ");
-  Serial.print((double) imu.g.y);
-  Serial.print("     ");
-  Serial.println((double) imu.g.z);
-  delay(100);
+  // Serial.print("A: ");
+  // Serial.print((double) imu.a.x* 0.061);
+  // Serial.print("     ");
+  // Serial.print((double) imu.a.y* 0.061);
+  // Serial.print("     ");
+  // Serial.print((double) imu.a.z* 0.061);
+  // Serial.print("     G: ");
+  // Serial.print((double) imu.g.x);
+  // Serial.print("     ");
+  // Serial.print((double) imu.g.y);
+  // Serial.print("     ");
+  // Serial.println((double) imu.g.z);
+  // delay(100);
 
-  int clipped_gz = imu.g.z;
-  if (clipped_gz < -255) clipped_gz = -255;
-  if (clipped_gz > 255) clipped_gz = 255;
+  // Calculate the angular rate and angular position of the body
 
-  analogWrite(9, abs(clipped_gz));
+
+
+  // Calculate control input
+  double inputVoltage1 = ;
+  double inputVoltage2 = imu.g.z;
+
+  int clippedMotorInput1 = saturateTo255(inputVoltage1);
+  int clippedMotorInput2 = saturateTo255(inputVoltage2);
+
+  analogWrite(9, abs(clippedMotorInput1));
+  analogWrite(9, abs(clippedMotorInput1));
   // analogWrite(10, 200); //ENB pin
   //(Optional)
   
@@ -103,4 +111,33 @@ void loop()
   // digitalWrite(motor1pin1,   LOW);
   // digitalWrite(motor1pin2, HIGH);
   // delay(3000);
+}
+
+
+// Ok here's what I need to do:
+// Overall: Two control inputs, as a function of angle and angular rate of the robot
+// Big pieces of code:
+// Filtering the IMU inputs (and getting real values)
+// Converting the input values into motor inputs.
+
+// input_voltage1, input_voltage2 = function(state)
+// staturated at +/- 255
+// based on input voltage sign, do either one of the pins
+int saturateTo255(double value) {
+  if (value > 255.0) return 255;
+  if (value < -255.0) return -255;
+  return static_cast<int>(value);
+}
+
+void writeToMotor(int clippedMotorInput) {
+  if (clipped_gz > 0) {
+    digitalWrite(motor1pin1, HIGH);
+    digitalWrite(motor1pin2, LOW);
+  } else if (clipped_gz < 0) {
+    digitalWrite(motor1pin1, LOW);
+    digitalWrite(motor1pin2, HIGH);
+  } else {
+    digitalWrite(motor1pin1, LOW);
+    digitalWrite(motor1pin2, LOW);
+  } 
 }
