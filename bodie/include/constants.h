@@ -1,0 +1,11 @@
+int MOTOR1PIN1 = 2;
+int MOTOR1PIN2 = 3;
+
+int MOTOR2PIN1 = 4;
+int MOTOR2PIN2 = 5;
+
+int MOTOR1SPEEDPIN = 9;
+int MOTOR2SPEEDPIN = 10;
+
+double ACCEL_FACTOR = 0.061;
+double GYRO_FACTOR = 8.75;

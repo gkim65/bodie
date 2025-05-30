@@ -16,18 +16,83 @@ significant bit) at this FS setting, so the raw reading of
 
 #include <Wire.h>
 #include <LSM6.h>
-#include "motor_driver.h"
+#include "constants.h"
+#include "math.h"
 #include <Arduino.h>
 LSM6 imu;
 
 char report[100];
 
+// Initialize omega history
+double omegaHistory[4] = {0.0, 0.0, 0.0, 0.0};
+static double theta = 0.0;
+unsigned long prev_time = 0;
+
+// TUNABLE PARAMETERS
+double blend_factor = 0.5;
+double Kp = 0.1;
+double Kd = 0.001;
+
+int saturateTo255(double value) {
+  if (value > 255.0) return 255;
+  if (value < -255.0) return -255;
+  return static_cast<int>(value);
+}
+
+
+typedef struct {
+  double pitch;
+  double pitchRate;
+} state;
+
+state estimateState(LSM6 imu) {
+
+  // TUNABLE PARAMETERS: BLEND_FACTOR, OMEGA FILTERING
+  
+  state RobotState;
+  for (int i = 3; i > 0; --i) {
+    omegaHistory[i] = omegaHistory[i - 1];
+  }
+
+  // Get pitch rate
+  double omega = (double)(imu.g.x*GYRO_FACTOR);
+  omegaHistory[0] = omega;
+
+  // Basic-ass low pass filter on the omega
+  double sum = 0.0;
+  for (int i = 0; i < 4; ++i) {
+    sum += omegaHistory[i];
+  }
+  double omegaFiltered = sum / 4.0;
+
+  // Get dt
+  unsigned long current_time = micros();
+  double dt = (current_time - prev_time) / 1e6;  // dt in seconds
+  prev_time = current_time;
+  // Integrate omega for theta
+  double thetaFromGyro = theta + omegaFiltered*dt;
+
+  // Get theta from accelerometer
+  double accelY = (double) imu.a.y*ACCEL_FACTOR;
+  double accelZ = (double) imu.a.z*ACCEL_FACTOR;
+  double thetaFromAccel = atan2(accelY,accelZ);
+
+  // Blend theta values
+  theta = blend_factor*thetaFromGyro + (1 - blend_factor)*thetaFromAccel;
+
+  RobotState.pitch = theta;
+  RobotState.pitchRate = omega;
+
+  return RobotState;
+}
+
 void setup()
 {
+  // Begin serial for debugging
   Serial.begin(9600);
   Wire.begin();
 
-  
+  // Initialize IMU
   while (!imu.init())
   {
     Serial.println("Failed to detect and initialize IMU!");
@@ -36,108 +101,64 @@ void setup()
   imu.enableDefault();
 
   // Setup the motor driver
-  pinMode(motor1pin1, OUTPUT);
-  pinMode(motor1pin2, OUTPUT);
-  pinMode(motor2pin1, OUTPUT);
-  pinMode(motor2pin2, OUTPUT);
+  pinMode(MOTOR1PIN1, OUTPUT);
+  pinMode(MOTOR1PIN2, OUTPUT);
+  pinMode(MOTOR2PIN1, OUTPUT);
+  pinMode(MOTOR2PIN2, OUTPUT);
 
   // Motor driver speed control
-  pinMode(9,   OUTPUT); 
-  pinMode(10, OUTPUT);
+  pinMode(MOTOR1SPEEDPIN, OUTPUT); 
+  pinMode(MOTOR2SPEEDPIN, OUTPUT);
+  
+  // Previous time for integration
+  prev_time = micros();
 }
 
 void loop()
 {
+  // Get IMU data
   imu.read();
-  // Serial.println(imu.g.z);
-
-  // snprintf(report, sizeof(report), "A: %8.2f %8.2f %8.2f    G: %8.2f %8.2f %8.2f",
-  //   imu.a.x* 0.061, imu.a.y* 0.061, imu.a.z* 0.061,
-  //   imu.g.x, imu.g.y, imu.g.z);
-  // Serial.print("A: ");
-  // Serial.print((double) imu.a.x* 0.061);
-  // Serial.print("     ");
-  // Serial.print((double) imu.a.y* 0.061);
-  // Serial.print("     ");
-  // Serial.print((double) imu.a.z* 0.061);
-  // Serial.print("     G: ");
-  // Serial.print((double) imu.g.x);
-  // Serial.print("     ");
-  // Serial.print((double) imu.g.y);
-  // Serial.print("     ");
-  // Serial.println((double) imu.g.z);
-  // delay(100);
 
   // Calculate the angular rate and angular position of the body
+  state RobotState = estimateState(imu);
 
-
+  Serial.print("pitch angle: ");
+  Serial.print(RobotState.pitch);
+  Serial.print("pitch rate: ");
+  Serial.print(RobotState.pitchRate);
 
   // Calculate control input
-  double inputVoltage1 = ;
-  double inputVoltage2 = imu.g.z;
+  double inputVoltage1 = Kp*RobotState.pitch + Kd*RobotState.pitchRate;
+  double inputVoltage2 = Kp*RobotState.pitch + Kd*RobotState.pitchRate;
 
   int clippedMotorInput1 = saturateTo255(inputVoltage1);
   int clippedMotorInput2 = saturateTo255(inputVoltage2);
 
-  analogWrite(9, abs(clippedMotorInput1));
-  analogWrite(9, abs(clippedMotorInput1));
-  // analogWrite(10, 200); //ENB pin
-  //(Optional)
-  
-  if (clipped_gz > 0) {
-    digitalWrite(motor1pin1, HIGH);
-    digitalWrite(motor1pin2, LOW);
-  } else if (clipped_gz < 0) {
-    digitalWrite(motor1pin1, LOW);
-    digitalWrite(motor1pin2, HIGH);
+  // Write speed signal
+  analogWrite(MOTOR1SPEEDPIN, abs(clippedMotorInput1));
+  analogWrite(MOTOR2SPEEDPIN, abs(clippedMotorInput1));
+
+  // Write motor directions
+  if (clippedMotorInput1 > 0) {
+    digitalWrite(MOTOR1PIN1, HIGH);
+    digitalWrite(MOTOR1PIN2, LOW);
+  } else if (clippedMotorInput1 < 0) {
+    digitalWrite(MOTOR1PIN1, LOW);
+    digitalWrite(MOTOR1PIN2, HIGH);
   } else {
-    digitalWrite(motor1pin1, LOW);
-    digitalWrite(motor1pin2, LOW);
-  }
-  // digitalWrite(motor1pin1,   HIGH);
-  // digitalWrite(motor1pin2, LOW);
-
-  // digitalWrite(motor2pin1, HIGH);
-  //  digitalWrite(motor2pin2, LOW);
-  // delay(3000);
-
-  // digitalWrite(motor1pin1,   LOW);
-  // digitalWrite(motor1pin2, HIGH);
-
-  // digitalWrite(motor2pin1, LOW);
-  // digitalWrite(motor2pin2, HIGH);
-  // delay(3000);
-
-  // digitalWrite(motor1pin1,   LOW);
-  // digitalWrite(motor1pin2, HIGH);
-  // delay(3000);
-}
-
-
-// Ok here's what I need to do:
-// Overall: Two control inputs, as a function of angle and angular rate of the robot
-// Big pieces of code:
-// Filtering the IMU inputs (and getting real values)
-// Converting the input values into motor inputs.
-
-// input_voltage1, input_voltage2 = function(state)
-// staturated at +/- 255
-// based on input voltage sign, do either one of the pins
-int saturateTo255(double value) {
-  if (value > 255.0) return 255;
-  if (value < -255.0) return -255;
-  return static_cast<int>(value);
-}
-
-void writeToMotor(int clippedMotorInput) {
-  if (clipped_gz > 0) {
-    digitalWrite(motor1pin1, HIGH);
-    digitalWrite(motor1pin2, LOW);
-  } else if (clipped_gz < 0) {
-    digitalWrite(motor1pin1, LOW);
-    digitalWrite(motor1pin2, HIGH);
-  } else {
-    digitalWrite(motor1pin1, LOW);
-    digitalWrite(motor1pin2, LOW);
+    digitalWrite(MOTOR1PIN1, LOW);
+    digitalWrite(MOTOR1PIN2, LOW);
   } 
+  if (clippedMotorInput2 > 0) {
+    digitalWrite(MOTOR2PIN1, HIGH);
+    digitalWrite(MOTOR2PIN2, LOW);
+  } else if (clippedMotorInput2 < 0) {
+    digitalWrite(MOTOR2PIN1, LOW);
+    digitalWrite(MOTOR2PIN2, HIGH);
+  } else {
+    digitalWrite(MOTOR2PIN1, LOW);
+    digitalWrite(MOTOR2PIN2, LOW);
+  } 
+
 }
+

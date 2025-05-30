@@ -1,5 +1,0 @@
-int MOTOR1PIN1 = 2;
-int MOTOR1PIN2 = 3;
-
-int MOTOR2PIN1 = 4;
-int MOTOR2PIN2 = 5;
