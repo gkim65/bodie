@@ -30,8 +30,8 @@ unsigned long prev_time = 0;
 
 // TUNABLE PARAMETERS
 double blend_factor = 0.5;
-double Kp = 0.1;
-double Kd = 0.001;
+double Kp = 15.0;
+double Kd = 0.5;
 
 int saturateTo255(double value) {
   if (value > 255.0) return 255;
@@ -55,7 +55,9 @@ state estimateState(LSM6 imu) {
   }
 
   // Get pitch rate
-  double omega = (double)(imu.g.x*GYRO_FACTOR);
+  double omega = (double)(imu.g.y*GYRO_FACTOR);
+  Serial.print("Omega raw: ");
+  Serial.println(omega);
   omegaHistory[0] = omega;
 
   // Basic-ass low pass filter on the omega
@@ -68,15 +70,21 @@ state estimateState(LSM6 imu) {
   // Get dt
   unsigned long current_time = micros();
   double dt = (current_time - prev_time) / 1e6;  // dt in seconds
+
+  Serial.print("Current Time: ");
+  Serial.println(current_time);
   prev_time = current_time;
   // Integrate omega for theta
   double thetaFromGyro = theta + omegaFiltered*dt;
-
+  Serial.print("Theta from gyro: ");
+  Serial.println(thetaFromGyro);
+  
   // Get theta from accelerometer
-  double accelY = (double) imu.a.y*ACCEL_FACTOR;
+  double accelX = (double) imu.a.x*ACCEL_FACTOR;
   double accelZ = (double) imu.a.z*ACCEL_FACTOR;
-  double thetaFromAccel = atan2(accelY,accelZ);
-
+  double thetaFromAccel = atan2(accelX,accelZ)*57.29;
+  Serial.print("Theta from accel: ");
+  Serial.println(thetaFromAccel);
   // Blend theta values
   theta = blend_factor*thetaFromGyro + (1 - blend_factor)*thetaFromAccel;
 
@@ -122,18 +130,26 @@ void loop()
   // Calculate the angular rate and angular position of the body
   state RobotState = estimateState(imu);
 
+  
   Serial.print("pitch angle: ");
-  Serial.print(RobotState.pitch);
+  Serial.println(RobotState.pitch);
   Serial.print("pitch rate: ");
-  Serial.print(RobotState.pitchRate);
+  Serial.println(RobotState.pitchRate);
 
   // Calculate control input
   double inputVoltage1 = Kp*RobotState.pitch + Kd*RobotState.pitchRate;
   double inputVoltage2 = Kp*RobotState.pitch + Kd*RobotState.pitchRate;
 
+  Serial.print("Input");
+  Serial.println(inputVoltage1);
+
   int clippedMotorInput1 = saturateTo255(inputVoltage1);
   int clippedMotorInput2 = saturateTo255(inputVoltage2);
 
+  Serial.print("clipped input");
+  Serial.println(clippedMotorInput1);
+
+  // delay(1000);
   // Write speed signal
   analogWrite(MOTOR1SPEEDPIN, abs(clippedMotorInput1));
   analogWrite(MOTOR2SPEEDPIN, abs(clippedMotorInput1));

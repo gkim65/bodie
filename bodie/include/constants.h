@@ -8,4 +8,4 @@ int MOTOR1SPEEDPIN = 9;
 int MOTOR2SPEEDPIN = 10;
 
 double ACCEL_FACTOR = 0.061;
-double GYRO_FACTOR = 8.75;
+double GYRO_FACTOR = 8.75*0.001;
