@@ -61,11 +61,19 @@ state estimateState(LSM6 imu) {
   omegaHistory[0] = omega;
 
   // Basic-ass low pass filter on the omega
-  double sum = 0.0;
+  double weights[4] = {0.8, 0.1, 0.05, 0.05};
+  double weightedSum = 0.0;
+  double weightTotal = 0.0;
   for (int i = 0; i < 4; ++i) {
-    sum += omegaHistory[i];
+    weightedSum += omegaHistory[i] * weights[i];
+    weightTotal += weights[i];
   }
-  double omegaFiltered = sum / 4.0;
+  double omegaFiltered = weightedSum / weightTotal;
+  // double sum = 0.0;
+  // for (int i = 0; i < 4; ++i) {
+  //   sum += omegaHistory[i];
+  // }
+  // double omegaFiltered = sum / 4.0;
 
   // Get dt
   unsigned long current_time = micros();
@@ -97,7 +105,8 @@ state estimateState(LSM6 imu) {
 void setup()
 {
   // Begin serial for debugging
-  Serial.begin(9600);
+  // Serial.begin(9600);
+  Serial.begin(115200);
   Wire.begin();
 
   // Initialize IMU
