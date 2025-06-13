@@ -4,9 +4,9 @@ import matplotlib.animation as animation
 from collections import deque
 
 # === CONFIG ===
-PORT = 'COM3'  # Or '/dev/ttyUSB0' or similar for Linux/WSL
+PORT = '/dev/cu.usbmodem2101'  # Or '/dev/ttyUSB0' or similar for Linux/WSL
 BAUD = 115200
-NUM_VALUES = 5
+NUM_VALUES = 4
 WINDOW_SIZE = 100  # Number of points to display
 
 # === SETUP ===
